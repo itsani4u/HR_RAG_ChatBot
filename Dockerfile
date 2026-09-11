@@ -1,4 +1,5 @@
-# HR RAG Chatbot - Cloud Run image
+# HR RAG Chatbot UI - Cloud Run image
+# (the ingest API is a separate service/image — see Dockerfile.ingest)
 FROM python:3.11-slim
 
 # System deps needed by faiss-cpu / pypdf wheels

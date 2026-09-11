@@ -4,6 +4,9 @@ langchain-classic
 langchain-community
 langchain-google-genai
 google-generativeai
+google-cloud-storage
 faiss-cpu
 pypdf
 python-dotenv
+fastapi
+uvicorn[standard]

@@ -1,16 +1,25 @@
-# Cloud Run service definition.
+# Cloud Run service definition for the CHATBOT UI.
+# The ingest API is a separate service — see ingest.yaml.
+#
 # Deploy with:
 #   gcloud run services replace app.yaml --region=YOUR_REGION --project=YOUR_PROJECT
 #
 # Before deploying:
-#   1. Build & push the image (see readme.md), then replace the `image:` value below.
-#   2. Create a secret for the Gemini key:
+#   1. Build & push this image from Dockerfile (see readme.md), replace `image:` below.
+#   2. Create the GCS bucket the ingest service publishes to, and grant this
+#      service's runtime service account read access:
+#        gsutil mb -l us-central1 gs://YOUR_BUCKET
+#        gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \
+#          --member="serviceAccount:YOUR_PROJECT_NUMBER-compute@developer.gserviceaccount.com" \
+#          --role="roles/storage.objectViewer"
+#   3. Create the Gemini key secret (same one the ingest service uses is fine):
 #        gcloud secrets create google-api-key --data-file=<(echo -n "YOUR_KEY")
-#      and grant the Cloud Run service account access:
 #        gcloud secrets add-iam-policy-binding google-api-key \
 #          --member="serviceAccount:YOUR_PROJECT_NUMBER-compute@developer.gserviceaccount.com" \
 #          --role="roles/secretmanager.secretAccessor"
-#   3. After the first deploy, allow public access if desired:
+#   4. Run the ingest service's /ingest endpoint at least once BEFORE the
+#      chatbot's first request, so there is an index in the bucket to load.
+#   5. Allow public access if desired:
 #        gcloud run services add-iam-policy-binding hr-rag-chatbot \
 #          --region=YOUR_REGION --member="allUsers" --role="roles/run.invoker"
 
@@ -39,6 +48,10 @@ spec:
               value: "gemini-2.5-flash"
             - name: EMBEDDING_MODEL
               value: "models/gemini-embedding-001"
+            - name: GCS_BUCKET
+              value: "YOUR_BUCKET"
+            - name: GCS_INDEX_PREFIX
+              value: "hr_faiss_index"
             - name: GOOGLE_API_KEY
               valueFrom:
                 secretKeyRef:

@@ -6,6 +6,8 @@ from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmb
 from langchain_community.vectorstores import FAISS
 from langchain.prompts import ChatPromptTemplate
 
+from gcs_utils import download_index_from_gcs
+
 # -----------------------------------------
 # ENV SETUP
 # -----------------------------------------
@@ -24,11 +26,33 @@ VECTOR_DB_PATH = "hr_faiss_index"
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "models/gemini-embedding-001")
 CHAT_MODEL = os.getenv("MODEL", "gemini-2.5-flash")
 
+# The ingest API (ingest_service.py) is deployed and invoked separately from
+# this chatbot. It publishes the FAISS index to GCS; this app pulls it down
+# on cold start (or reuses a local copy if one is already on disk).
+GCS_BUCKET = os.getenv("GCS_BUCKET")
+GCS_INDEX_PREFIX = os.getenv("GCS_INDEX_PREFIX", "hr_faiss_index")
+
 # -----------------------------------------
 # LOAD VECTOR STORE (CACHED)
 # -----------------------------------------
 @st.cache_resource
 def load_vectorstore():
+    index_file = os.path.join(VECTOR_DB_PATH, "index.faiss")
+    if not os.path.exists(index_file):
+        if not GCS_BUCKET:
+            st.error(
+                "No local FAISS index found and GCS_BUCKET is not set. "
+                "Run the ingest service first, or run `python ingest.py` locally."
+            )
+            st.stop()
+        found = download_index_from_gcs(GCS_BUCKET, GCS_INDEX_PREFIX, VECTOR_DB_PATH)
+        if not found:
+            st.error(
+                f"No index found at gs://{GCS_BUCKET}/{GCS_INDEX_PREFIX}. "
+                "Call the ingest service's /ingest endpoint first."
+            )
+            st.stop()
+
     embeddings = GoogleGenerativeAIEmbeddings(model=EMBEDDING_MODEL)
     vectorstore = FAISS.load_local(
         VECTOR_DB_PATH,
